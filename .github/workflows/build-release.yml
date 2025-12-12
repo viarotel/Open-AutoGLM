@@ -1,33 +1,33 @@
-# GitHub Actions Workflow: 跨平台构建与自动发布
-# 用于自动使用 PyInstaller 构建独立可执行文件并发布到 GitHub Releases
+# GitHub Actions Workflow: Cross-platform Build and Auto-release
+# Automatically build standalone executables using PyInstaller and publish to GitHub Releases
 #
-# 触发方式:
-#   - workflow_dispatch: 手动触发
-#   - schedule: 每日定时检查（可选）
-#   - push: 推送到 main 分支时触发（适用于同步 Fork 场景）
+# Trigger methods:
+#   - workflow_dispatch: Manual trigger
+#   - schedule: Daily scheduled check (optional)
+#   - push: Triggered on push to main branch (suitable for Fork sync scenarios)
 
 name: Build and Release
 
 on:
-  # 手动触发，支持自定义版本号
+  # Manual trigger with custom version number support
   workflow_dispatch:
     inputs:
       version_suffix:
-        description: '可选的版本号后缀（留空则自动生成）'
+        description: 'Optional version suffix (leave empty for auto-generation)'
         required: false
         default: ''
       pre_release:
-        description: '是否标记为预发布版本'
+        description: 'Mark as pre-release version'
         required: false
         type: boolean
         default: false
 
-  # 定时触发（每天 UTC 时间 00:00，即北京时间 08:00）
-  # 取消注释下面的 schedule 以启用定时构建
+  # Scheduled trigger (daily at 00:00 UTC, 08:00 Beijing time)
+  # Uncomment the schedule below to enable scheduled builds
   # schedule:
   #   - cron: '0 0 * * *'
 
-  # 推送到 main 分支时触发（适用于同步上游后自动构建）
+  # Triggered on push to main branch (suitable for auto-build after upstream sync)
   push:
     branches:
       - main
@@ -38,7 +38,7 @@ on:
       - '.github/PULL_REQUEST_TEMPLATE.md'
       - '.github/copilot-instructions.md'
 
-# 确保同一时间只有一个构建任务运行
+# Ensure only one build task runs at a time
 concurrency:
   group: build-release-${{ github.ref }}
   cancel-in-progress: true
@@ -48,7 +48,7 @@ env:
   PROJECT_NAME: 'phone-agent'
 
 jobs:
-  # 准备阶段：生成版本号
+  # Preparation stage: Generate version number
   prepare:
     name: Prepare Build
     runs-on: ubuntu-latest
@@ -64,16 +64,16 @@ jobs:
       - name: Check if build is needed
         id: check
         run: |
-          # 对于 workflow_dispatch 和 schedule，总是构建
+          # For workflow_dispatch and schedule, always build
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || [[ "${{ github.event_name }}" == "schedule" ]]; then
             echo "should_build=true" >> $GITHUB_OUTPUT
             exit 0
           fi
           
-          # 对于 push 事件，检查是否有实质性更改
+          # For push events, check if there are substantial changes
           CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
           if [[ -n "$CHANGED_FILES" ]]; then
-            # 排除纯文档更改
+            # Exclude pure documentation changes
             CODE_CHANGES=$(echo "$CHANGED_FILES" | grep -v -E '\.md$|^docs/|^\.github/(ISSUE_TEMPLATE|PULL_REQUEST_TEMPLATE|copilot)' || true)
             if [[ -n "$CODE_CHANGES" ]]; then
               echo "should_build=true" >> $GITHUB_OUTPUT
@@ -87,10 +87,10 @@ jobs:
       - name: Generate version number
         id: version
         run: |
-          # 格式: vYYYYMMDD-HHMM
+          # Format: vYYYYMMDD-HHMM
           VERSION="v$(date -u +'%Y%m%d-%H%M')"
           
-          # 如果提供了自定义后缀，则附加
+          # Append custom suffix if provided
           if [[ -n "${{ github.event.inputs.version_suffix }}" ]]; then
             VERSION="${VERSION}-${{ github.event.inputs.version_suffix }}"
           fi
@@ -98,7 +98,7 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "📦 Build version: ${VERSION}"
 
-  # 构建阶段：多平台矩阵构建
+  # Build stage: Multi-platform matrix build
   build:
     name: Build on ${{ matrix.os }} (${{ matrix.arch }})
     needs: prepare
@@ -111,14 +111,14 @@ jobs:
           # macOS x64
           - os: macos
             arch: x64
-            runner: macos-14-intel
+            runner: macos-15-intel
             artifact_name: phone-agent-macos-x64
             executable_ext: ''
           
           # macOS ARM64 (Apple Silicon)
           - os: macos
             arch: arm64
-            runner: macos-14
+            runner: macos-15
             artifact_name: phone-agent-macos-arm64
             executable_ext: ''
           
@@ -139,7 +139,7 @@ jobs:
           # Windows x64
           - os: windows
             arch: x64
-            runner: windows-11
+            runner: windows-2025
             artifact_name: phone-agent-windows-x64
             executable_ext: '.exe'
           
@@ -173,14 +173,14 @@ jobs:
       - name: Install dependencies (Unix)
         if: runner.os != 'Windows'
         run: |
-          # 创建虚拟环境并安装项目依赖
+          # Create virtual environment and install project dependencies
           python -m venv .venv
           source .venv/bin/activate
           pip install --upgrade pip
           pip install -r requirements.txt
           pip install -e .
           
-          # 在虚拟环境中安装 PyInstaller
+          # Install PyInstaller in the virtual environment
           pip install pyinstaller
 
       - name: Install dependencies (Windows)
@@ -190,14 +190,14 @@ jobs:
           PYTHONUTF8: '1'
           PYTHONIOENCODING: 'utf-8'
         run: |
-          # 创建虚拟环境并安装项目依赖
+          # Create virtual environment and install project dependencies
           python -m venv .venv
           .\.venv\Scripts\Activate.ps1
           pip install --upgrade pip
           pip install -r requirements.txt
           pip install -e .
           
-          # 在虚拟环境中安装 PyInstaller
+          # Install PyInstaller in the virtual environment
           pip install pyinstaller
 
       - name: Build with PyInstaller (Unix)
@@ -205,7 +205,7 @@ jobs:
         run: |
           source .venv/bin/activate
           
-          # 使用 PyInstaller 构建
+          # Build with PyInstaller
           pyinstaller \
             --name="${{ env.PROJECT_NAME }}" \
             --onefile \
@@ -235,7 +235,7 @@ jobs:
             --collect-all="phone_agent" \
             main.py
           
-          # 验证构建产物
+          # Verify build artifacts
           ls -la dist/
           ./dist/${{ env.PROJECT_NAME }} --help || echo "Help command executed"
 
@@ -248,7 +248,7 @@ jobs:
         run: |
           .\.venv\Scripts\Activate.ps1
           
-          # 使用 PyInstaller 构建
+          # Build with PyInstaller
           pyinstaller `
             --name="${{ env.PROJECT_NAME }}" `
             --onefile `
@@ -278,7 +278,7 @@ jobs:
             --collect-all="phone_agent" `
             main.py
           
-          # 验证构建产物
+          # Verify build artifacts
           Get-ChildItem dist/
           .\dist\${{ env.PROJECT_NAME }}.exe --help
 
@@ -287,7 +287,7 @@ jobs:
         run: |
           mkdir -p artifact
           
-          # 复制可执行文件
+          # Copy executable file
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             cp "dist/${{ env.PROJECT_NAME }}${{ matrix.executable_ext }}" "artifact/${{ matrix.artifact_name }}${{ matrix.executable_ext }}"
           else
@@ -295,11 +295,11 @@ jobs:
             chmod +x "artifact/${{ matrix.artifact_name }}"
           fi
           
-          # 复制必要的资源文件
+          # Copy necessary resource files
           cp README.md artifact/ || true
           cp LICENSE artifact/ || true
           
-          # 显示产物信息
+          # Display artifact information
           ls -la artifact/
 
       - name: Create archive (Unix)
@@ -327,7 +327,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  # 发布阶段：创建 GitHub Release
+  # Release stage: Create GitHub Release
   release:
     name: Create Release
     needs: [prepare, build]
@@ -348,16 +348,16 @@ jobs:
         run: |
           mkdir -p release-assets
           
-          # 移动所有构建产物到 release-assets 目录
+          # Move all build artifacts to release-assets directory
           find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec mv {} release-assets/ \;
           
-          # 生成校验和
+          # Generate checksums
           cd release-assets
           sha256sum * > SHA256SUMS.txt
           cat SHA256SUMS.txt
           cd ..
           
-          # 显示所有发布资产
+          # Display all release assets
           echo "📦 Release assets:"
           ls -la release-assets/
 
@@ -369,10 +369,10 @@ jobs:
           cat << EOF > release_notes.md
           ## 🚀 Phone Agent ${VERSION}
           
-          ### 📦 下载
+          ### 📦 Download
           
-          | 平台 | 架构 | 下载链接 |
-          |------|------|----------|
+          | Platform | Architecture | Download Link |
+          |----------|--------------|---------------|
           | macOS | x64 (Intel) | \`phone-agent-macos-x64.tar.gz\` |
           | macOS | ARM64 (Apple Silicon) | \`phone-agent-macos-arm64.tar.gz\` |
           | Linux | x64 | \`phone-agent-linux-x64.tar.gz\` |
@@ -380,46 +380,46 @@ jobs:
           | Windows | x64 | \`phone-agent-windows-x64.zip\` |
           | Windows | ARM64 | \`phone-agent-windows-arm64.zip\` |
           
-          ### 📋 安装说明
+          ### 📋 Installation Instructions
           
           #### macOS / Linux
           \`\`\`bash
-          # 解压
+          # Extract
           tar -xzf phone-agent-<platform>-<arch>.tar.gz
           
-          # 添加执行权限（如果需要）
+          # Add execute permission (if needed)
           chmod +x phone-agent-<platform>-<arch>
           
-          # 运行
+          # Run
           ./phone-agent-<platform>-<arch> --help
           \`\`\`
           
           #### Windows
           \`\`\`powershell
-          # 解压 zip 文件
+          # Extract zip file
           Expand-Archive phone-agent-windows-<arch>.zip -DestinationPath .
           
-          # 运行
+          # Run
           .\phone-agent-windows-<arch>.exe --help
           \`\`\`
           
-          ### ⚠️ 运行前提
+          ### ⚠️ Prerequisites
           
-          - 确保 ADB 工具已安装并在 PATH 中
-          - 确保 Android 设备已通过 USB 或 WiFi 连接
-          - 确保设备上已安装并启用 ADB Keyboard
+          - Ensure ADB tools are installed and in PATH
+          - Ensure Android device is connected via USB or WiFi
+          - Ensure ADB Keyboard is installed and enabled on the device
           
-          ### 🔗 相关链接
+          ### 🔗 Related Links
           
-          - [使用文档](https://github.com/${{ github.repository }}/blob/main/README.md)
-          - [问题反馈](https://github.com/${{ github.repository }}/issues)
+          - [Documentation](https://github.com/${{ github.repository }}/blob/main/README.md)
+          - [Issue Tracker](https://github.com/${{ github.repository }}/issues)
           
           ---
           
-          **构建信息**
-          - 构建时间: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
-          - 触发方式: ${{ github.event_name }}
-          - 提交: ${{ github.sha }}
+          **Build Information**
+          - Build Time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          - Trigger: ${{ github.event_name }}
+          - Commit: ${{ github.sha }}
           EOF
           
           echo "Release notes generated."
@@ -451,7 +451,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "🔗 [View Release](https://github.com/${{ github.repository }}/releases/tag/${{ needs.prepare.outputs.version }})" >> $GITHUB_STEP_SUMMARY
 
-  # 清理阶段：删除过期的 artifacts
+  # Cleanup stage: Delete expired artifacts
   cleanup:
     name: Cleanup
     needs: [release]
