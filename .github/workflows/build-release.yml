@@ -111,7 +111,7 @@ jobs:
           # macOS x64
           - os: macos
             arch: x64
-            runner: macos-13
+            runner: macos-14-intel
             artifact_name: phone-agent-macos-x64
             executable_ext: ''
           
@@ -139,7 +139,7 @@ jobs:
           # Windows x64
           - os: windows
             arch: x64
-            runner: windows-latest
+            runner: windows-11
             artifact_name: phone-agent-windows-x64
             executable_ext: '.exe'
           
@@ -186,6 +186,9 @@ jobs:
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+          PYTHONUTF8: '1'
+          PYTHONIOENCODING: 'utf-8'
         run: |
           # 创建虚拟环境并安装项目依赖
           python -m venv .venv
@@ -239,6 +242,9 @@ jobs:
       - name: Build with PyInstaller (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+          PYTHONUTF8: '1'
+          PYTHONIOENCODING: 'utf-8'
         run: |
           .\.venv\Scripts\Activate.ps1
           
